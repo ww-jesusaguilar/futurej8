@@ -35,6 +35,15 @@ public class MainTester{
                     case 8:
                         Example.ejecutarCompletableFuture();
                         break;
+                    case 9:
+                        Example.ejecutarCompletableFutureCombined();
+                        break;
+                    case 10:
+                        Example.ejecutarListenableFuture();
+                        break;
+                    case 11:
+                        Example.ejecutarListenableFuturesEncadenados();
+                        break;
                 }
             } catch (InterruptedException ie) {
 

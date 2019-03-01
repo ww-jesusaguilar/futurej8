@@ -1,7 +1,14 @@
 package com.futuresj8.example;
 
-import java.util.Arrays;
-import java.util.List;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.util.concurrent.*;
+import org.jdeferred2.DeferredManager;
+import org.jdeferred2.Promise;
+
+import javax.xml.ws.Response;
+import java.sql.Time;
+import java.util.*;
 import java.util.concurrent.*;
 
 public class Example{
@@ -135,8 +142,105 @@ public class Example{
             catch (InterruptedException e) {
                 throw new IllegalStateException("task interrupted", e);
             }
-        }).thenApply(i -> i * 3)
+        }).thenApply(i -> i / 3)
           .thenAccept(i -> System.out.println("The result is " + i))
-          .thenRun(() -> System.out.println("Finished."));
+          .exceptionally(ex -> {System.out.println(ex.getMessage()); return null;});
+    }
+
+    public static void ejecutarCompletableFutureCombined() throws ExecutionException, InterruptedException{
+        System.out.println("Retrieving weight.");
+        CompletableFuture<Double> weightInKgFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                TimeUnit.SECONDS.sleep(1);
+            } catch (InterruptedException e) {
+                throw new IllegalStateException(e);
+            }
+            return 90.0;
+        });
+
+        System.out.println("Retrieving height.");
+        CompletableFuture<Double> heightInCmFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                TimeUnit.SECONDS.sleep(1);
+            } catch (InterruptedException e) {
+                throw new IllegalStateException(e);
+            }
+            return 177.8;
+        });
+
+        System.out.println("Calculating BMI.");
+        CompletableFuture<Double> combinedFuture = weightInKgFuture
+                .thenCombine(heightInCmFuture, (weightInKg, heightInCm) -> {
+                    Double heightInMeter = heightInCm/100;
+                    return weightInKg/(heightInMeter*heightInMeter);
+                });
+
+        System.out.println("Your BMI is - " + combinedFuture.get());
+    }
+
+    public static void ejecutarListenableFuture() throws InterruptedException{
+        ListeningExecutorService service = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
+        ListenableFuture<Integer> lFEntero = service.submit(new Callable<Integer>() {
+            public Integer call() throws InterruptedException {
+                TimeUnit.SECONDS.sleep(3);
+                return (Integer) 15/3;
+            }
+        });
+        Futures.addCallback(lFEntero, new FutureCallback<Integer>() {
+            // we want this handler to run immediately after we push the big red button!
+            public void onSuccess(Integer numero) {
+                System.out.println("El cuadrado es: " + numero);
+            }
+
+            public void onFailure(Throwable thrown) {
+                System.out.println("Error: " + thrown.getMessage()); // escaped the explosion!
+            }
+        }, service);
+    }
+    
+    public static void ejecutarListenableFuturesEncadenados(){
+        ListeningExecutorService service = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
+        ListenableFuture<Integer> integerFuture = service.submit(() -> {
+            return 0;
+        });
+        AsyncFunction<Integer, String> queryFunction =
+                new AsyncFunction<Integer, String>() {
+                    public ListenableFuture<String> apply(Integer integer) {
+                        return service.submit(() -> {
+                            return "decimal " + 10000/integer;
+                        });
+                    }
+                };
+        ListenableFuture<String> queryFuture =
+                Futures.transformAsync(integerFuture, queryFunction, MoreExecutors.directExecutor());
+
+        Futures.addCallback(queryFuture, new FutureCallback<String>() {
+            // we want this handler to run immediately after we push the big red button!
+            public void onSuccess(String resultado) {
+                System.out.println("El resultado es: " + resultado);
+            }
+
+            public void onFailure(Throwable thrown) {
+                System.out.println("Error: " + thrown.getMessage()); // escaped the explosion!
+            }
+        }, service);
+    }
+
+    private DeferredManager deferredManager;
+
+    public static Integer callable2(Integer result, long sleepSeconds) throws InterruptedException {
+            TimeUnit.SECONDS.sleep(sleepSeconds);
+            return result;
+    }
+
+    public Promise<Integer, Throwable, Void> repositories(final String organization) {
+        return deferredManager.when(()  -> {
+            Integer integer = -1;
+
+            integer = callable2(28, 3);
+
+            if (integer != -1) { return integer; }
+            throw new IllegalStateException("Error");
+        });
     }
 }
